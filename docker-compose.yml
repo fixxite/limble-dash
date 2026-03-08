@@ -1,0 +1,8 @@
+services:
+  limble-dash:
+    build: .
+    ports:
+      - "3002:3002"
+    env_file:
+      - config.env
+    restart: unless-stopped
