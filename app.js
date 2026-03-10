@@ -11,7 +11,7 @@ const WO_TAGS_STORAGE_KEY = 'limble_dash_wo_tags';
 
 const state = {
   workOrders: [],
-  filter: { status: 'all', priority: 'all', tag: 'all' },
+  filter: { status: 'all', priority: 'all', tag: 'all', location: 'all' },
   loading: false,
   error: null,
   tags: loadTagsFromStorage(),
@@ -86,12 +86,13 @@ async function fetchWorkOrders() {
       state.locationMap[l.locationID] = l.name;
     }
 
-    // Filter out templates, use real WOs only
+    // Filter out templates
     const raw = Array.isArray(tasks) ? tasks : (tasks.data ?? []);
     state.workOrders = raw.filter(t => !t.template);
 
     refreshStatusFilter();
     refreshPriorityFilter();
+    refreshLocationSwitch();
     refreshTagFilter();
   } catch (err) {
     state.error = err.message;
@@ -164,11 +165,41 @@ function refreshPriorityFilter() {
   }
 }
 
+function refreshLocationSwitch() {
+  const container = document.getElementById('location-switch');
+  if (!container) return;
+
+  const names = [...new Set(Object.values(state.locationMap))].sort();
+  container.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'loc-btn' + (state.filter.location === 'all' ? ' active' : '');
+  allBtn.textContent = 'All';
+  allBtn.addEventListener('click', () => setLocation('all'));
+  container.appendChild(allBtn);
+
+  for (const name of names) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'loc-btn' + (state.filter.location === name ? ' active' : '');
+    btn.textContent = name;
+    btn.addEventListener('click', () => setLocation(name));
+    container.appendChild(btn);
+  }
+}
+
+function setLocation(name) {
+  state.filter.location = name;
+  refreshLocationSwitch();
+  renderMain();
+}
+
 // ── Filters ──────────────────────────────────────────────────────────────────
 
 function applyFilters(orders) {
   return orders.filter(wo => {
-    const { status, priority, tag } = state.filter;
+    const { status, priority, tag, location } = state.filter;
 
     if (status !== 'all') {
       const cls = state.statusMap[String(wo.status ?? '')]?.cls ?? '';
@@ -182,6 +213,11 @@ function applyFilters(orders) {
 
     if (tag !== 'all') {
       if (!woTagIds(wo).includes(Number(tag))) return false;
+    }
+
+    if (location !== 'all') {
+      const locName = (wo.locationID && state.locationMap[wo.locationID]) || wo.location || 'Unassigned';
+      if (locName !== location) return false;
     }
 
     return true;
@@ -199,7 +235,6 @@ function el(tag, cls, inner) {
 
 function fmtDate(val) {
   if (!val) return '—';
-  // Accept unix seconds or ms / ISO strings
   const ms = typeof val === 'number' ? val * 1000 : val;
   try { return new Date(ms).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }); }
   catch { return String(val); }
@@ -216,6 +251,7 @@ function fmtPriority(wo) {
 function renderCard(wo) {
   const status = fmtStatus(wo);
   const priority = fmtPriority(wo);
+  const locName = (wo.locationID && state.locationMap[wo.locationID]) || wo.location || '';
   const tags = woTagIds(wo);
   const card = el('div', 'card');
 
@@ -229,6 +265,7 @@ function renderCard(wo) {
         <span class="priority-dot" style="background:${priority.color}" title="Priority: ${escHtml(priority.label)}"></span>
         <span><span class="label">Priority:</span> ${escHtml(priority.label)}</span>
       </div>
+      ${locName ? `<div class="card-meta-row"><span class="label">Location:</span> ${escHtml(locName)}</div>` : ''}
       ${wo.dueDate || wo.due ? `<div class="card-meta-row"><span class="label">Due:</span> ${fmtDate(wo.due || wo.dueDate)}</div>` : ''}
     </div>
     ${tagChipsHtml(tags)}
@@ -238,16 +275,7 @@ function renderCard(wo) {
   return card;
 }
 
-function groupByLocation(orders) {
-  const groups = {};
-  for (const wo of orders) {
-    const loc = (wo.locationID && state.locationMap[wo.locationID]) || wo.location || 'Unassigned';
-    (groups[loc] ??= []).push(wo);
-  }
-  return groups;
-}
-
-function renderColumns() {
+function renderMain() {
   const main = document.getElementById('main');
   const countEl = document.getElementById('wo-count');
 
@@ -271,28 +299,10 @@ function renderColumns() {
     return;
   }
 
-  const groups = groupByLocation(filtered);
-  const layout = el('div', 'column-layout');
-
-  const locNames = Object.keys(groups).filter(k => k !== 'Unassigned').sort();
-  if (groups['Unassigned']) locNames.push('Unassigned');
-
-  for (const loc of locNames) {
-    const wos = groups[loc];
-    const col = el('div', 'column');
-    const header = el('div', 'column-header');
-    header.innerHTML = `<span>${escHtml(loc)}</span><span class="col-count">${wos.length}</span>`;
-    col.appendChild(header);
-    wos.forEach(wo => col.appendChild(renderCard(wo)));
-    layout.appendChild(col);
-  }
-
+  const grid = el('div', 'card-grid');
+  filtered.forEach(wo => grid.appendChild(renderCard(wo)));
   main.innerHTML = '';
-  main.appendChild(layout);
-}
-
-function renderMain() {
-  renderColumns();
+  main.appendChild(grid);
 }
 
 // ── Utilities ────────────────────────────────────────────────────────────────

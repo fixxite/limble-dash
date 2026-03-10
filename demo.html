@@ -21,11 +21,6 @@
   --status-in-progress-bg: #fffbeb;
   --status-completed: #10b981;
   --status-completed-bg: #ecfdf5;
-  --priority-none: #9ca3af;
-  --priority-low: #3b82f6;
-  --priority-medium: #f59e0b;
-  --priority-high: #f97316;
-  --priority-critical: #ef4444;
   --radius: 8px; --radius-sm: 4px;
   --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
   --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.05);
@@ -60,21 +55,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   background: var(--color-surface); color: var(--color-text); cursor: pointer; }
 .wo-count { margin-left: auto; font-size: 13px; color: var(--color-text-muted); }
 
-.main { max-width: none; margin: 0; }
+/* Location switch */
+.location-switch { display: flex; gap: 4px; flex-wrap: wrap; }
+.loc-btn { padding: 3px 10px; border: 1px solid var(--color-border);
+  border-radius: 12px; background: var(--color-surface); color: var(--color-text-muted);
+  font-size: 12px; font-weight: 500; cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s; white-space: nowrap; }
+.loc-btn:hover { background: var(--color-secondary-bg); color: var(--color-text); }
+.loc-btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
 
-/* Column layout */
-.column-layout { display: flex; gap: 16px; overflow-x: auto; padding: 24px; align-items: flex-start; }
-.column { flex: 0 0 320px; display: flex; flex-direction: column; gap: 10px; }
-.column-header {
-  font-weight: 600; font-size: 13px; padding: 6px 10px;
-  background: var(--color-surface); border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm); display: flex; justify-content: space-between;
-  align-items: center; position: sticky; top: 0;
-}
-.column-header .col-count {
-  font-size: 11px; font-weight: 500; color: var(--color-text-muted);
-  background: var(--color-secondary-bg); padding: 1px 7px; border-radius: 10px;
-}
+.main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 
 .card { background: var(--color-surface); border: 1px solid var(--color-border);
   border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
@@ -93,11 +84,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .card-meta-row .label { font-weight: 500; color: var(--color-text); min-width: 60px; }
 
 .priority-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.priority-none     { background: var(--priority-none); }
-.priority-low      { background: var(--priority-low); }
-.priority-medium   { background: var(--priority-medium); }
-.priority-high     { background: var(--priority-high); }
-.priority-critical { background: var(--priority-critical); }
 
 .card-footer { font-size: 11px; color: var(--color-text-muted);
   border-top: 1px solid var(--color-border); padding-top: 8px; }
@@ -145,6 +131,10 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
     <label class="filter-group">Tag:
       <select id="filter-tag"><option value="all">All</option></select>
     </label>
+    <div class="filter-group">
+      Location:
+      <div id="location-switch" class="location-switch"></div>
+    </div>
     <span id="wo-count" class="wo-count"></span>
   </div>
 
@@ -154,11 +144,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 'use strict';
 
 const PRIORITY_MAP = {
-  '':  { label: 'None',     cls: 'none'     },
-  '1': { label: 'Low',      cls: 'low'      },
-  '2': { label: 'Medium',   cls: 'medium'   },
-  '3': { label: 'High',     cls: 'high'     },
-  '4': { label: 'Critical', cls: 'critical' },
+  '':  { label: 'None',     cls: 'none',     color: '#9ca3af' },
+  '1': { label: 'Low',      cls: 'low',      color: '#3b82f6' },
+  '2': { label: 'Medium',   cls: 'medium',   color: '#f59e0b' },
+  '3': { label: 'High',     cls: 'high',     color: '#f97316' },
+  '4': { label: 'Critical', cls: 'critical', color: '#ef4444' },
 };
 const STATUS_MAP = {
   '1': { label: 'Open',        cls: 'open'       },
@@ -168,33 +158,32 @@ const STATUS_MAP = {
 
 // ── Mock work orders ──────────────────────────────────────────────────────────
 const MOCK_WOS = [
-  { id: 1001, name: 'Replace HVAC filter — Building A',    description: 'Monthly filter replacement on roof unit #3.',                              statusID: 1, priorityID: 2, assetName: 'HVAC Unit #3',              assignedTo: 'Jordan Lee',    dueDate: '2026-03-15', updatedAt: '2026-03-07T14:22:00Z', location: 'Building A'       },
-  { id: 1002, name: 'Conveyor belt tension adjustment',     description: 'Belt slipping on line 2. Adjust tensioner and inspect rollers.',          statusID: 2, priorityID: 3, assetName: 'Conveyor Line 2',           assignedTo: 'Sam Rivera',    dueDate: '2026-03-10', updatedAt: '2026-03-08T08:05:00Z', location: 'Production Floor' },
-  { id: 1003, name: 'Boiler annual inspection',             description: 'Annual boiler safety inspection per code 45B.',                           statusID: 1, priorityID: 4, assetName: 'Boiler Room — Unit 1',       assignedTo: 'Chris Park',    dueDate: '2026-03-09', updatedAt: '2026-03-06T11:30:00Z', location: 'Building A'       },
-  { id: 1004, name: 'Lubricate pump bearings',              description: 'PM task: lubricate all pump bearings on the main water loop.',            statusID: 3, priorityID: 1, assetName: 'Pump Station B',             assignedTo: 'Jordan Lee',    dueDate: '2026-03-05', updatedAt: '2026-03-05T16:45:00Z', location: 'Production Floor' },
-  { id: 1005, name: 'Fix flickering lights — Warehouse C',  description: 'Multiple fluorescent fixtures flickering. May need ballast replacements.',statusID: 2, priorityID: 2, assetName: 'Warehouse C — Lighting',     assignedTo: 'Taylor Nguyen', dueDate: '2026-03-12', updatedAt: '2026-03-07T09:18:00Z', location: 'Building A'       },
-  { id: 1006, name: 'Inspect fire suppression system',      description: 'Quarterly check of sprinkler heads, pressure gauges, and control valves.',statusID: 1, priorityID: 3, assetName: 'Fire Suppression — East Wing',assignedTo: 'Morgan Kim',    dueDate: '2026-03-20', updatedAt: '2026-03-04T13:00:00Z', location: 'East Wing'        },
-  { id: 1007, name: 'Compressor oil change',                description: 'Change oil and filters on air compressor C-04.',                         statusID: 3, priorityID: 2, assetName: 'Air Compressor C-04',        assignedTo: 'Sam Rivera',    dueDate: '2026-03-01', updatedAt: '2026-03-02T10:10:00Z', location: 'Production Floor' },
-  { id: 1008, name: 'Patch roof leak — loading dock',       description: 'Water intrusion near dock door #5. Seal and weatherproof.',               statusID: 1, priorityID: 4, assetName: 'Roof — Section D',           assignedTo: null,            dueDate: '2026-03-11', updatedAt: '2026-03-08T07:50:00Z', location: 'East Wing'        },
-  { id: 1009, name: 'Calibrate temperature sensors',        description: 'Recalibrate sensors T-12 through T-18 in cold storage zone.',             statusID: 2, priorityID: 2, assetName: 'Cold Storage Zone 2',        assignedTo: 'Taylor Nguyen', dueDate: '2026-03-14', updatedAt: '2026-03-07T15:00:00Z', location: 'Production Floor' },
-  { id: 1010, name: 'Replace forklift battery — FL-02',     description: 'Battery no longer holding charge. Order and install replacement.',        statusID: 1, priorityID: 3, assetName: 'Forklift FL-02',             assignedTo: 'Morgan Kim',    dueDate: '2026-03-13', updatedAt: '2026-03-06T12:25:00Z', location: 'Yard & Utilities' },
-  { id: 1011, name: 'Monthly generator test run',           description: 'Run standby generator for 30 min under load. Log output and fuel level.', statusID: 3, priorityID: 1, assetName: 'Standby Generator G-1',      assignedTo: 'Chris Park',    dueDate: '2026-03-01', updatedAt: '2026-03-01T09:00:00Z', location: 'Yard & Utilities' },
-  { id: 1012, name: 'Inspect electrical panel — Room 14',   description: 'Breaker tripped twice this week. Check for overloads or wiring issues.',  statusID: 1, priorityID: 4, assetName: 'Electrical Panel R14',       assignedTo: null,            dueDate: '2026-03-09', updatedAt: '2026-03-08T06:45:00Z', location: 'East Wing'        },
+  { id: 1001, name: 'Replace HVAC filter — Building A',    statusID: 1, priorityID: 2, assetName: 'HVAC Unit #3',              assignedTo: 'Jordan Lee',    dueDate: '2026-03-15', updatedAt: '2026-03-07T14:22:00Z', location: 'Building A'       },
+  { id: 1002, name: 'Conveyor belt tension adjustment',    statusID: 2, priorityID: 3, assetName: 'Conveyor Line 2',           assignedTo: 'Sam Rivera',    dueDate: '2026-03-10', updatedAt: '2026-03-08T08:05:00Z', location: 'Production Floor' },
+  { id: 1003, name: 'Boiler annual inspection',            statusID: 1, priorityID: 4, assetName: 'Boiler Room — Unit 1',      assignedTo: 'Chris Park',    dueDate: '2026-03-09', updatedAt: '2026-03-06T11:30:00Z', location: 'Building A'       },
+  { id: 1004, name: 'Lubricate pump bearings',             statusID: 3, priorityID: 1, assetName: 'Pump Station B',            assignedTo: 'Jordan Lee',    dueDate: '2026-03-05', updatedAt: '2026-03-05T16:45:00Z', location: 'Production Floor' },
+  { id: 1005, name: 'Fix flickering lights — Warehouse C', statusID: 2, priorityID: 2, assetName: 'Warehouse C — Lighting',    assignedTo: 'Taylor Nguyen', dueDate: '2026-03-12', updatedAt: '2026-03-07T09:18:00Z', location: 'Building A'       },
+  { id: 1006, name: 'Inspect fire suppression system',     statusID: 1, priorityID: 3, assetName: 'Fire Suppression — East Wing', assignedTo: 'Morgan Kim', dueDate: '2026-03-20', updatedAt: '2026-03-04T13:00:00Z', location: 'East Wing'        },
+  { id: 1007, name: 'Compressor oil change',               statusID: 3, priorityID: 2, assetName: 'Air Compressor C-04',       assignedTo: 'Sam Rivera',    dueDate: '2026-03-01', updatedAt: '2026-03-02T10:10:00Z', location: 'Production Floor' },
+  { id: 1008, name: 'Patch roof leak — loading dock',      statusID: 1, priorityID: 4, assetName: 'Roof — Section D',          assignedTo: null,            dueDate: '2026-03-11', updatedAt: '2026-03-08T07:50:00Z', location: 'East Wing'        },
+  { id: 1009, name: 'Calibrate temperature sensors',       statusID: 2, priorityID: 2, assetName: 'Cold Storage Zone 2',       assignedTo: 'Taylor Nguyen', dueDate: '2026-03-14', updatedAt: '2026-03-07T15:00:00Z', location: 'Production Floor' },
+  { id: 1010, name: 'Replace forklift battery — FL-02',    statusID: 1, priorityID: 3, assetName: 'Forklift FL-02',            assignedTo: 'Morgan Kim',    dueDate: '2026-03-13', updatedAt: '2026-03-06T12:25:00Z', location: 'Yard & Utilities' },
+  { id: 1011, name: 'Monthly generator test run',          statusID: 3, priorityID: 1, assetName: 'Standby Generator G-1',     assignedTo: 'Chris Park',    dueDate: '2026-03-01', updatedAt: '2026-03-01T09:00:00Z', location: 'Yard & Utilities' },
+  { id: 1012, name: 'Inspect electrical panel — Room 14',  statusID: 1, priorityID: 4, assetName: 'Electrical Panel R14',      assignedTo: null,            dueDate: '2026-03-09', updatedAt: '2026-03-08T06:45:00Z', location: 'East Wing'        },
 ];
 
-// Default tags shipped with the demo
 const DEFAULT_TAGS = [
-  { id: 1, label: 'Safety',      color: '#ef4444' },
-  { id: 2, label: 'Electrical',  color: '#f59e0b' },
-  { id: 3, label: 'HVAC',        color: '#3b82f6' },
-  { id: 4, label: 'Preventive',  color: '#10b981' },
-  { id: 5, label: 'Emergency',   color: '#7c3aed' },
-  { id: 6, label: 'Plumbing',    color: '#0ea5e9' },
+  { id: 1, label: 'Safety',     color: '#ef4444' },
+  { id: 2, label: 'Electrical', color: '#f59e0b' },
+  { id: 3, label: 'HVAC',       color: '#3b82f6' },
+  { id: 4, label: 'Preventive', color: '#10b981' },
+  { id: 5, label: 'Emergency',  color: '#7c3aed' },
+  { id: 6, label: 'Plumbing',   color: '#0ea5e9' },
 ];
 const DEFAULT_WO_TAGS = {
-  1001: [3, 4], 1002: [4],     1003: [1, 4], 1004: [4],
-  1005: [2],    1006: [1],     1007: [4],    1008: [6],
-  1009: [4],    1010: [2],     1011: [1, 4], 1012: [1, 2, 5],
+  1001: [3, 4], 1002: [4],      1003: [1, 4], 1004: [4],
+  1005: [2],    1006: [1],      1007: [4],    1008: [6],
+  1009: [4],    1010: [2],      1011: [1, 4], 1012: [1, 2, 5],
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -205,7 +194,7 @@ function saveLS(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 
 const state = {
   workOrders: [...MOCK_WOS],
-  filter: { status: 'all', priority: 'all', tag: 'all' },
+  filter: { status: 'all', priority: 'all', tag: 'all', location: 'all' },
   tags: loadLS('demo_tags', DEFAULT_TAGS),
   nextTagId: 0,
   woTagMap: loadLS('demo_wo_tags', DEFAULT_WO_TAGS),
@@ -240,7 +229,7 @@ function tagChipsHtml(ids) {
 // ── Filters ───────────────────────────────────────────────────────────────────
 function applyFilters(orders) {
   return orders.filter(wo => {
-    const { status, priority, tag } = state.filter;
+    const { status, priority, tag, location } = state.filter;
     if (status !== 'all') {
       const cls = STATUS_MAP[String(wo.statusID)]?.cls ?? '';
       if (cls !== status) return false;
@@ -251,6 +240,9 @@ function applyFilters(orders) {
     }
     if (tag !== 'all') {
       if (!woTagIds(wo).includes(Number(tag))) return false;
+    }
+    if (location !== 'all') {
+      if ((wo.location || 'Unassigned') !== location) return false;
     }
     return true;
   });
@@ -269,11 +261,12 @@ function renderCard(wo) {
     </div>
     <div class="card-meta">
       <div class="card-meta-row">
-        <span class="priority-dot priority-${pr.cls}"></span>
+        <span class="priority-dot" style="background:${pr.color}"></span>
         <span><span class="label">Priority:</span> ${pr.label}</span>
       </div>
       ${wo.assetName ? `<div class="card-meta-row"><span class="label">Asset:</span> ${escHtml(wo.assetName)}</div>` : ''}
       ${wo.assignedTo ? `<div class="card-meta-row"><span class="label">Assignee:</span> ${escHtml(wo.assignedTo)}</div>` : ''}
+      ${wo.location ? `<div class="card-meta-row"><span class="label">Location:</span> ${escHtml(wo.location)}</div>` : ''}
       ${wo.dueDate ? `<div class="card-meta-row"><span class="label">Due:</span> ${fmtDate(wo.dueDate)}</div>` : ''}
     </div>
     ${tagChipsHtml(woTagIds(wo))}
@@ -281,47 +274,20 @@ function renderCard(wo) {
   return card;
 }
 
-function groupByLocation(orders) {
-  const groups = {};
-  for (const wo of orders) {
-    const loc = wo.location || 'Unassigned';
-    (groups[loc] ??= []).push(wo);
-  }
-  return groups;
-}
-
 function renderMain() {
   const main = document.getElementById('main');
   const countEl = document.getElementById('wo-count');
   const filtered = applyFilters(state.workOrders);
   countEl.textContent = `${filtered.length} of ${state.workOrders.length} work orders`;
-
   if (!filtered.length) {
     main.innerHTML = '<div class="state-box"><h3>No work orders found</h3><p>Try adjusting your filters.</p></div>';
     return;
   }
-
-  const groups = groupByLocation(filtered);
-  const layout = document.createElement('div');
-  layout.className = 'column-layout';
-
-  const locNames = Object.keys(groups).filter(k => k !== 'Unassigned').sort();
-  if (groups['Unassigned']) locNames.push('Unassigned');
-
-  for (const loc of locNames) {
-    const wos = groups[loc];
-    const col = document.createElement('div');
-    col.className = 'column';
-    const header = document.createElement('div');
-    header.className = 'column-header';
-    header.innerHTML = `<span>${escHtml(loc)}</span><span class="col-count">${wos.length}</span>`;
-    col.appendChild(header);
-    wos.forEach(wo => col.appendChild(renderCard(wo)));
-    layout.appendChild(col);
-  }
-
+  const grid = document.createElement('div');
+  grid.className = 'card-grid';
+  filtered.forEach(wo => grid.appendChild(renderCard(wo)));
   main.innerHTML = '';
-  main.appendChild(layout);
+  main.appendChild(grid);
 }
 
 function refreshTagFilter() {
@@ -333,6 +299,29 @@ function refreshTagFilter() {
   state.filter.tag = sel.value;
 }
 
+function refreshLocationSwitch() {
+  const container = document.getElementById('location-switch');
+  if (!container) return;
+  const names = [...new Set(state.workOrders.map(wo => wo.location || 'Unassigned'))].sort();
+  container.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'loc-btn' + (state.filter.location === 'all' ? ' active' : '');
+  allBtn.textContent = 'All';
+  allBtn.addEventListener('click', () => { state.filter.location = 'all'; refreshLocationSwitch(); renderMain(); });
+  container.appendChild(allBtn);
+
+  for (const name of names) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'loc-btn' + (state.filter.location === name ? ' active' : '');
+    btn.textContent = name;
+    btn.addEventListener('click', () => { state.filter.location = name; refreshLocationSwitch(); renderMain(); });
+    container.appendChild(btn);
+  }
+}
+
 // ── Wire up ───────────────────────────────────────────────────────────────────
 document.getElementById('filter-status').addEventListener('change', e => { state.filter.status = e.target.value; renderMain(); });
 document.getElementById('filter-priority').addEventListener('change', e => { state.filter.priority = e.target.value; renderMain(); });
@@ -340,6 +329,7 @@ document.getElementById('filter-tag').addEventListener('change', e => { state.fi
 document.getElementById('btn-refresh').addEventListener('click', renderMain);
 
 refreshTagFilter();
+refreshLocationSwitch();
 renderMain();
   </script>
 </body>
