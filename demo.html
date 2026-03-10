@@ -48,11 +48,8 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .btn { display: inline-flex; align-items: center; gap: 4px;
   padding: 7px 14px; border-radius: var(--radius-sm); border: none;
   font-size: 13px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
-.btn-primary { background: var(--color-primary); color: #fff; }
-.btn-primary:hover { background: var(--color-primary-hover); }
 .btn-secondary { background: var(--color-secondary-bg); color: var(--color-text); }
 .btn-secondary:hover { background: var(--color-secondary-hover); }
-.btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .filter-bar { padding: 12px 24px; background: var(--color-surface);
   border-bottom: 1px solid var(--color-border); display: flex;
@@ -63,14 +60,25 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
   background: var(--color-surface); color: var(--color-text); cursor: pointer; }
 .wo-count { margin-left: auto; font-size: 13px; color: var(--color-text-muted); }
 
-.main { padding: 24px; max-width: 1400px; margin: 0 auto; }
-.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.main { max-width: none; margin: 0; }
+
+/* Column layout */
+.column-layout { display: flex; gap: 16px; overflow-x: auto; padding: 24px; align-items: flex-start; }
+.column { flex: 0 0 320px; display: flex; flex-direction: column; gap: 10px; }
+.column-header {
+  font-weight: 600; font-size: 13px; padding: 6px 10px;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); display: flex; justify-content: space-between;
+  align-items: center; position: sticky; top: 0;
+}
+.column-header .col-count {
+  font-size: 11px; font-weight: 500; color: var(--color-text-muted);
+  background: var(--color-secondary-bg); padding: 1px 7px; border-radius: 10px;
+}
 
 .card { background: var(--color-surface); border: 1px solid var(--color-border);
   border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
-  cursor: pointer; transition: box-shadow 0.15s, transform 0.1s;
   display: flex; flex-direction: column; gap: 10px; }
-.card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .card-title { font-size: 14px; font-weight: 600; flex: 1; }
 
@@ -100,65 +108,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .tag-chips { display: flex; flex-wrap: wrap; gap: 4px; }
 .tag-chip { display: inline-flex; align-items: center; gap: 3px;
   padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500; white-space: nowrap; }
-
-.tag-field-label { font-size: 13px; font-weight: 500; margin-bottom: 4px; display: block; }
-.tag-selector { display: flex; flex-wrap: wrap; gap: 6px; min-height: 38px; padding: 6px;
-  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-  background: var(--color-secondary-bg); cursor: default; }
-.tag-selector-chip { display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;
-  cursor: pointer; user-select: none; border: 2px solid transparent;
-  opacity: 0.45; transition: opacity 0.12s, border-color 0.12s; }
-.tag-selector-chip:hover { opacity: 0.75; }
-.tag-selector-chip.selected { opacity: 1; border-color: rgba(0,0,0,0.2); }
-.tag-selector-empty { font-size: 12px; color: var(--color-text-muted); align-self: center; }
-
-.tag-new-row { display: flex; gap: 6px; align-items: center; margin-top: 6px; }
-.tag-new-row input[type="text"] { flex: 1; padding: 6px 8px;
-  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-  font-size: 13px; font-family: inherit; background: var(--color-surface); }
-.tag-new-row input[type="text"]:focus { outline: none; border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-.tag-new-row input[type="color"] { width: 34px; height: 34px; padding: 2px;
-  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-  cursor: pointer; flex-shrink: 0; background: none; }
-.tag-manage-list { display: flex; flex-direction: column; gap: 4px; max-height: 110px; overflow-y: auto; margin-top: 6px; }
-.tag-manage-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 2px 0; }
-.tag-manage-row .tag-chip { flex: 1; }
-.tag-delete-btn { background: none; border: none; cursor: pointer; font-size: 14px;
-  color: var(--color-text-muted); padding: 0 4px; line-height: 1; flex-shrink: 0; }
-.tag-delete-btn:hover { color: var(--status-open); }
-
-/* Modal */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45);
-  display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
-.modal-overlay.hidden { display: none; }
-.modal { background: var(--color-surface); border-radius: var(--radius);
-  width: 100%; max-width: 520px; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
-  display: flex; flex-direction: column; max-height: 90vh; }
-.modal-header { padding: 16px 20px; border-bottom: 1px solid var(--color-border);
-  display: flex; justify-content: space-between; align-items: center; }
-.modal-header h2 { font-size: 16px; font-weight: 600; }
-.modal-close { background: none; border: none; font-size: 20px; cursor: pointer;
-  color: var(--color-text-muted); line-height: 1; padding: 2px 6px; border-radius: 4px; }
-.modal-close:hover { background: var(--color-secondary-bg); }
-.modal-body { padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
-.modal-footer { display: flex; justify-content: flex-end; gap: 8px; padding-top: 8px; }
-.field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
-.field > span { font-weight: 500; }
-.field input, .field textarea, .field select {
-  padding: 8px 10px; border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm); font-size: 13px; font-family: inherit;
-  background: var(--color-surface); color: var(--color-text); transition: border-color 0.15s; }
-.field input:focus, .field textarea:focus, .field select:focus {
-  outline: none; border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
-.field textarea { resize: vertical; }
-.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.required { color: var(--status-open); }
-.form-error { background: var(--status-open-bg); color: var(--status-open);
-  border: 1px solid var(--status-open); border-radius: var(--radius-sm);
-  padding: 8px 12px; font-size: 13px; }
-.form-error.hidden { display: none; }
   </style>
 </head>
 <body>
@@ -171,7 +120,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
     </div>
     <div class="header-right">
       <button id="btn-refresh" class="btn btn-secondary">&#8635; Refresh</button>
-      <button id="btn-new" class="btn btn-primary">+ New Work Order</button>
     </div>
   </header>
 
@@ -202,64 +150,6 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 
   <main id="main" class="main"></main>
 
-  <div id="modal-overlay" class="modal-overlay hidden">
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <h2 id="modal-title">Work Order</h2>
-        <button id="modal-close" class="modal-close" aria-label="Close">&times;</button>
-      </div>
-      <form id="wo-form" class="modal-body" novalidate>
-        <label class="field">
-          <span>Title <span class="required">*</span></span>
-          <input type="text" name="name" required />
-        </label>
-        <label class="field">
-          <span>Description</span>
-          <textarea name="description" rows="3"></textarea>
-        </label>
-        <div class="field-row">
-          <label class="field">
-            <span>Priority</span>
-            <select name="priorityID">
-              <option value="">None</option>
-              <option value="1">Low</option>
-              <option value="2">Medium</option>
-              <option value="3">High</option>
-              <option value="4">Critical</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Status</span>
-            <select name="statusID">
-              <option value="1">Open</option>
-              <option value="2">In Progress</option>
-              <option value="3">Completed</option>
-            </select>
-          </label>
-        </div>
-        <label class="field">
-          <span>Due Date</span>
-          <input type="date" name="dueDate" />
-        </label>
-        <div class="field">
-          <span class="tag-field-label">Tags</span>
-          <div id="tag-selector" class="tag-selector"></div>
-          <div class="tag-new-row">
-            <input type="text" id="new-tag-input" placeholder="New tag name…" maxlength="30" />
-            <input type="color" id="new-tag-color" value="#3b82f6" title="Tag color" />
-            <button type="button" id="btn-create-tag" class="btn btn-secondary">+ Add</button>
-          </div>
-          <div id="tag-manage-list" class="tag-manage-list"></div>
-        </div>
-        <div id="form-error" class="form-error hidden"></div>
-        <div class="modal-footer">
-          <button type="button" id="form-cancel" class="btn btn-secondary">Cancel</button>
-          <button type="submit" id="form-submit" class="btn btn-primary">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
   <script>
 'use strict';
 
@@ -278,18 +168,18 @@ const STATUS_MAP = {
 
 // ── Mock work orders ──────────────────────────────────────────────────────────
 const MOCK_WOS = [
-  { id: 1001, name: 'Replace HVAC filter — Building A', description: 'Monthly filter replacement on roof unit #3.', statusID: 1, priorityID: 2, assetName: 'HVAC Unit #3', assignedTo: 'Jordan Lee', dueDate: '2026-03-15', updatedAt: '2026-03-07T14:22:00Z' },
-  { id: 1002, name: 'Conveyor belt tension adjustment', description: 'Belt slipping on line 2. Adjust tensioner and inspect rollers.', statusID: 2, priorityID: 3, assetName: 'Conveyor Line 2', assignedTo: 'Sam Rivera', dueDate: '2026-03-10', updatedAt: '2026-03-08T08:05:00Z' },
-  { id: 1003, name: 'Boiler annual inspection', description: 'Annual boiler safety inspection per code 45B.', statusID: 1, priorityID: 4, assetName: 'Boiler Room — Unit 1', assignedTo: 'Chris Park', dueDate: '2026-03-09', updatedAt: '2026-03-06T11:30:00Z' },
-  { id: 1004, name: 'Lubricate pump bearings', description: 'PM task: lubricate all pump bearings on the main water loop.', statusID: 3, priorityID: 1, assetName: 'Pump Station B', assignedTo: 'Jordan Lee', dueDate: '2026-03-05', updatedAt: '2026-03-05T16:45:00Z' },
-  { id: 1005, name: 'Fix flickering lights — Warehouse C', description: 'Multiple fluorescent fixtures flickering. May need ballast replacements.', statusID: 2, priorityID: 2, assetName: 'Warehouse C — Lighting', assignedTo: 'Taylor Nguyen', dueDate: '2026-03-12', updatedAt: '2026-03-07T09:18:00Z' },
-  { id: 1006, name: 'Inspect fire suppression system', description: 'Quarterly check of sprinkler heads, pressure gauges, and control valves.', statusID: 1, priorityID: 3, assetName: 'Fire Suppression — East Wing', assignedTo: 'Morgan Kim', dueDate: '2026-03-20', updatedAt: '2026-03-04T13:00:00Z' },
-  { id: 1007, name: 'Compressor oil change', description: 'Change oil and filters on air compressor C-04.', statusID: 3, priorityID: 2, assetName: 'Air Compressor C-04', assignedTo: 'Sam Rivera', dueDate: '2026-03-01', updatedAt: '2026-03-02T10:10:00Z' },
-  { id: 1008, name: 'Patch roof leak — loading dock', description: 'Water intrusion near dock door #5. Seal and weatherproof.', statusID: 1, priorityID: 4, assetName: 'Roof — Section D', assignedTo: null, dueDate: '2026-03-11', updatedAt: '2026-03-08T07:50:00Z' },
-  { id: 1009, name: 'Calibrate temperature sensors', description: 'Recalibrate sensors T-12 through T-18 in cold storage zone.', statusID: 2, priorityID: 2, assetName: 'Cold Storage Zone 2', assignedTo: 'Taylor Nguyen', dueDate: '2026-03-14', updatedAt: '2026-03-07T15:00:00Z' },
-  { id: 1010, name: 'Replace forklift battery — FL-02', description: 'Battery no longer holding charge. Order and install replacement.', statusID: 1, priorityID: 3, assetName: 'Forklift FL-02', assignedTo: 'Morgan Kim', dueDate: '2026-03-13', updatedAt: '2026-03-06T12:25:00Z' },
-  { id: 1011, name: 'Monthly generator test run', description: 'Run standby generator for 30 min under load. Log output and fuel level.', statusID: 3, priorityID: 1, assetName: 'Standby Generator G-1', assignedTo: 'Chris Park', dueDate: '2026-03-01', updatedAt: '2026-03-01T09:00:00Z' },
-  { id: 1012, name: 'Inspect electrical panel — Room 14', description: 'Breaker tripped twice this week. Check for overloads or wiring issues.', statusID: 1, priorityID: 4, assetName: 'Electrical Panel R14', assignedTo: null, dueDate: '2026-03-09', updatedAt: '2026-03-08T06:45:00Z' },
+  { id: 1001, name: 'Replace HVAC filter — Building A',    description: 'Monthly filter replacement on roof unit #3.',                              statusID: 1, priorityID: 2, assetName: 'HVAC Unit #3',              assignedTo: 'Jordan Lee',    dueDate: '2026-03-15', updatedAt: '2026-03-07T14:22:00Z', location: 'Building A'       },
+  { id: 1002, name: 'Conveyor belt tension adjustment',     description: 'Belt slipping on line 2. Adjust tensioner and inspect rollers.',          statusID: 2, priorityID: 3, assetName: 'Conveyor Line 2',           assignedTo: 'Sam Rivera',    dueDate: '2026-03-10', updatedAt: '2026-03-08T08:05:00Z', location: 'Production Floor' },
+  { id: 1003, name: 'Boiler annual inspection',             description: 'Annual boiler safety inspection per code 45B.',                           statusID: 1, priorityID: 4, assetName: 'Boiler Room — Unit 1',       assignedTo: 'Chris Park',    dueDate: '2026-03-09', updatedAt: '2026-03-06T11:30:00Z', location: 'Building A'       },
+  { id: 1004, name: 'Lubricate pump bearings',              description: 'PM task: lubricate all pump bearings on the main water loop.',            statusID: 3, priorityID: 1, assetName: 'Pump Station B',             assignedTo: 'Jordan Lee',    dueDate: '2026-03-05', updatedAt: '2026-03-05T16:45:00Z', location: 'Production Floor' },
+  { id: 1005, name: 'Fix flickering lights — Warehouse C',  description: 'Multiple fluorescent fixtures flickering. May need ballast replacements.',statusID: 2, priorityID: 2, assetName: 'Warehouse C — Lighting',     assignedTo: 'Taylor Nguyen', dueDate: '2026-03-12', updatedAt: '2026-03-07T09:18:00Z', location: 'Building A'       },
+  { id: 1006, name: 'Inspect fire suppression system',      description: 'Quarterly check of sprinkler heads, pressure gauges, and control valves.',statusID: 1, priorityID: 3, assetName: 'Fire Suppression — East Wing',assignedTo: 'Morgan Kim',    dueDate: '2026-03-20', updatedAt: '2026-03-04T13:00:00Z', location: 'East Wing'        },
+  { id: 1007, name: 'Compressor oil change',                description: 'Change oil and filters on air compressor C-04.',                         statusID: 3, priorityID: 2, assetName: 'Air Compressor C-04',        assignedTo: 'Sam Rivera',    dueDate: '2026-03-01', updatedAt: '2026-03-02T10:10:00Z', location: 'Production Floor' },
+  { id: 1008, name: 'Patch roof leak — loading dock',       description: 'Water intrusion near dock door #5. Seal and weatherproof.',               statusID: 1, priorityID: 4, assetName: 'Roof — Section D',           assignedTo: null,            dueDate: '2026-03-11', updatedAt: '2026-03-08T07:50:00Z', location: 'East Wing'        },
+  { id: 1009, name: 'Calibrate temperature sensors',        description: 'Recalibrate sensors T-12 through T-18 in cold storage zone.',             statusID: 2, priorityID: 2, assetName: 'Cold Storage Zone 2',        assignedTo: 'Taylor Nguyen', dueDate: '2026-03-14', updatedAt: '2026-03-07T15:00:00Z', location: 'Production Floor' },
+  { id: 1010, name: 'Replace forklift battery — FL-02',     description: 'Battery no longer holding charge. Order and install replacement.',        statusID: 1, priorityID: 3, assetName: 'Forklift FL-02',             assignedTo: 'Morgan Kim',    dueDate: '2026-03-13', updatedAt: '2026-03-06T12:25:00Z', location: 'Yard & Utilities' },
+  { id: 1011, name: 'Monthly generator test run',           description: 'Run standby generator for 30 min under load. Log output and fuel level.', statusID: 3, priorityID: 1, assetName: 'Standby Generator G-1',      assignedTo: 'Chris Park',    dueDate: '2026-03-01', updatedAt: '2026-03-01T09:00:00Z', location: 'Yard & Utilities' },
+  { id: 1012, name: 'Inspect electrical panel — Room 14',   description: 'Breaker tripped twice this week. Check for overloads or wiring issues.',  statusID: 1, priorityID: 4, assetName: 'Electrical Panel R14',       assignedTo: null,            dueDate: '2026-03-09', updatedAt: '2026-03-08T06:45:00Z', location: 'East Wing'        },
 ];
 
 // Default tags shipped with the demo
@@ -301,20 +191,10 @@ const DEFAULT_TAGS = [
   { id: 5, label: 'Emergency',   color: '#7c3aed' },
   { id: 6, label: 'Plumbing',    color: '#0ea5e9' },
 ];
-// Default WO → tag assignments
 const DEFAULT_WO_TAGS = {
-  1001: [3, 4],   // HVAC filter → HVAC, Preventive
-  1002: [4],      // Conveyor → Preventive
-  1003: [1, 4],   // Boiler inspection → Safety, Preventive
-  1004: [4],      // Pump bearings → Preventive
-  1005: [2],      // Flickering lights → Electrical
-  1006: [1],      // Fire suppression → Safety
-  1007: [4],      // Compressor oil → Preventive
-  1008: [6],      // Roof leak → Plumbing
-  1009: [4],      // Sensors → Preventive
-  1010: [2],      // Forklift battery → Electrical
-  1011: [1, 4],   // Generator test → Safety, Preventive
-  1012: [1, 2, 5],// Electrical panel → Safety, Electrical, Emergency
+  1001: [3, 4], 1002: [4],     1003: [1, 4], 1004: [4],
+  1005: [2],    1006: [1],     1007: [4],    1008: [6],
+  1009: [4],    1010: [2],     1011: [1, 4], 1012: [1, 2, 5],
 };
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -326,12 +206,9 @@ function saveLS(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
 const state = {
   workOrders: [...MOCK_WOS],
   filter: { status: 'all', priority: 'all', tag: 'all' },
-  editTarget: null,
-  nextId: 1013,
   tags: loadLS('demo_tags', DEFAULT_TAGS),
   nextTagId: 0,
   woTagMap: loadLS('demo_wo_tags', DEFAULT_WO_TAGS),
-  modalTagIds: new Set(),
 };
 state.nextTagId = state.tags.length ? Math.max(...state.tags.map(t => t.id)) + 1 : 7;
 
@@ -384,7 +261,7 @@ function renderCard(wo) {
   const st = STATUS_MAP[String(wo.statusID)] ?? { label: 'Unknown', cls: 'unknown' };
   const pr = PRIORITY_MAP[String(wo.priorityID ?? '')] ?? PRIORITY_MAP[''];
   const card = document.createElement('div');
-  card.className = 'card'; card.tabIndex = 0;
+  card.className = 'card';
   card.innerHTML = `
     <div class="card-header">
       <span class="card-title">${escHtml(wo.name)}</span>
@@ -401,10 +278,16 @@ function renderCard(wo) {
     </div>
     ${tagChipsHtml(woTagIds(wo))}
     <div class="card-footer">Updated ${fmtDate(wo.updatedAt)}</div>`;
-  const open = () => openModal(wo);
-  card.addEventListener('click', open);
-  card.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' ') open(); });
   return card;
+}
+
+function groupByLocation(orders) {
+  const groups = {};
+  for (const wo of orders) {
+    const loc = wo.location || 'Unassigned';
+    (groups[loc] ??= []).push(wo);
+  }
+  return groups;
 }
 
 function renderMain() {
@@ -412,15 +295,33 @@ function renderMain() {
   const countEl = document.getElementById('wo-count');
   const filtered = applyFilters(state.workOrders);
   countEl.textContent = `${filtered.length} of ${state.workOrders.length} work orders`;
+
   if (!filtered.length) {
-    main.innerHTML = '<div class="state-box"><h3>No work orders found</h3><p>Try adjusting your filters or create a new work order.</p></div>';
+    main.innerHTML = '<div class="state-box"><h3>No work orders found</h3><p>Try adjusting your filters.</p></div>';
     return;
   }
-  const grid = document.createElement('div');
-  grid.className = 'card-grid';
-  filtered.forEach(wo => grid.appendChild(renderCard(wo)));
+
+  const groups = groupByLocation(filtered);
+  const layout = document.createElement('div');
+  layout.className = 'column-layout';
+
+  const locNames = Object.keys(groups).filter(k => k !== 'Unassigned').sort();
+  if (groups['Unassigned']) locNames.push('Unassigned');
+
+  for (const loc of locNames) {
+    const wos = groups[loc];
+    const col = document.createElement('div');
+    col.className = 'column';
+    const header = document.createElement('div');
+    header.className = 'column-header';
+    header.innerHTML = `<span>${escHtml(loc)}</span><span class="col-count">${wos.length}</span>`;
+    col.appendChild(header);
+    wos.forEach(wo => col.appendChild(renderCard(wo)));
+    layout.appendChild(col);
+  }
+
   main.innerHTML = '';
-  main.appendChild(grid);
+  main.appendChild(layout);
 }
 
 function refreshTagFilter() {
@@ -432,144 +333,11 @@ function refreshTagFilter() {
   state.filter.tag = sel.value;
 }
 
-// ── Modal tag selector ────────────────────────────────────────────────────────
-function renderModalTagSelector() {
-  const sel = document.getElementById('tag-selector');
-  const mgr = document.getElementById('tag-manage-list');
-  if (!sel) return;
-
-  if (!state.tags.length) {
-    sel.innerHTML = '<span class="tag-selector-empty">No tags yet — create one below</span>';
-  } else {
-    sel.innerHTML = state.tags.map(t => {
-      const on = state.modalTagIds.has(t.id) ? 'selected' : '';
-      return `<span class="tag-selector-chip ${on}" data-id="${t.id}" style="${tagStyle(t.color)}">${escHtml(t.label)}</span>`;
-    }).join('');
-    sel.querySelectorAll('.tag-selector-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const id = Number(chip.dataset.id);
-        if (state.modalTagIds.has(id)) { state.modalTagIds.delete(id); chip.classList.remove('selected'); }
-        else { state.modalTagIds.add(id); chip.classList.add('selected'); }
-      });
-    });
-  }
-
-  if (mgr) {
-    mgr.innerHTML = state.tags.map(t =>
-      `<div class="tag-manage-row">
-        <span class="tag-chip" style="${tagStyle(t.color)}">${escHtml(t.label)}</span>
-        <button type="button" class="tag-delete-btn" data-id="${t.id}" title="Delete tag">✕</button>
-      </div>`
-    ).join('');
-    mgr.querySelectorAll('.tag-delete-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const id = Number(btn.dataset.id);
-        state.tags = state.tags.filter(t => t.id !== id);
-        state.modalTagIds.delete(id);
-        for (const k of Object.keys(state.woTagMap))
-          state.woTagMap[k] = state.woTagMap[k].filter(x => x !== id);
-        saveLS('demo_tags', state.tags);
-        saveLS('demo_wo_tags', state.woTagMap);
-        refreshTagFilter();
-        renderModalTagSelector();
-        renderMain();
-      });
-    });
-  }
-}
-
-// ── Modal open/close ──────────────────────────────────────────────────────────
-function openModal(wo) {
-  state.editTarget = wo ?? null;
-  document.getElementById('modal-title').textContent = wo ? 'Edit Work Order' : 'New Work Order';
-  const form = document.getElementById('wo-form');
-  document.getElementById('form-error').classList.add('hidden');
-  form.elements['name'].value = wo?.name ?? '';
-  form.elements['description'].value = wo?.description ?? '';
-  form.elements['priorityID'].value = String(wo?.priorityID ?? '');
-  form.elements['statusID'].value = String(wo?.statusID ?? '1');
-  form.elements['dueDate'].value = wo?.dueDate ? wo.dueDate.split('T')[0] : '';
-  state.modalTagIds = new Set(wo ? woTagIds(wo) : []);
-  renderModalTagSelector();
-  document.getElementById('new-tag-input').value = '';
-  document.getElementById('modal-overlay').classList.remove('hidden');
-  form.elements['name'].focus();
-}
-function closeModal() {
-  document.getElementById('modal-overlay').classList.add('hidden');
-  state.editTarget = null;
-  state.modalTagIds = new Set();
-}
-
-// ── Form submit ───────────────────────────────────────────────────────────────
-document.getElementById('wo-form').addEventListener('submit', e => {
-  e.preventDefault();
-  const form = e.target;
-  const name = form.elements['name'].value.trim();
-  if (!name) {
-    const err = document.getElementById('form-error');
-    err.textContent = 'Title is required.'; err.classList.remove('hidden'); return;
-  }
-  const now = new Date().toISOString();
-  let woId;
-  if (state.editTarget) {
-    woId = state.editTarget.id;
-    Object.assign(state.editTarget, {
-      name,
-      description: form.elements['description'].value.trim(),
-      priorityID: form.elements['priorityID'].value ? Number(form.elements['priorityID'].value) : null,
-      statusID: Number(form.elements['statusID'].value),
-      dueDate: form.elements['dueDate'].value || null,
-      updatedAt: now,
-    });
-  } else {
-    woId = state.nextId++;
-    state.workOrders.unshift({
-      id: woId, name,
-      description: form.elements['description'].value.trim(),
-      priorityID: form.elements['priorityID'].value ? Number(form.elements['priorityID'].value) : null,
-      statusID: Number(form.elements['statusID'].value),
-      assetName: null, assignedTo: null,
-      dueDate: form.elements['dueDate'].value || null,
-      updatedAt: now,
-    });
-  }
-  state.woTagMap[woId] = [...state.modalTagIds];
-  saveLS('demo_wo_tags', state.woTagMap);
-  closeModal();
-  renderMain();
-});
-
-// ── Create tag ────────────────────────────────────────────────────────────────
-function createTag() {
-  const input = document.getElementById('new-tag-input');
-  const colorInput = document.getElementById('new-tag-color');
-  const label = input.value.trim();
-  if (!label) { input.focus(); return; }
-  if (state.tags.find(t => t.label.toLowerCase() === label.toLowerCase())) { input.select(); return; }
-  const tag = { id: state.nextTagId++, label, color: colorInput.value };
-  state.tags.push(tag);
-  state.modalTagIds.add(tag.id);
-  saveLS('demo_tags', state.tags);
-  refreshTagFilter();
-  renderModalTagSelector();
-  input.value = ''; input.focus();
-}
-document.getElementById('btn-create-tag').addEventListener('click', createTag);
-document.getElementById('new-tag-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); createTag(); }
-});
-
 // ── Wire up ───────────────────────────────────────────────────────────────────
 document.getElementById('filter-status').addEventListener('change', e => { state.filter.status = e.target.value; renderMain(); });
 document.getElementById('filter-priority').addEventListener('change', e => { state.filter.priority = e.target.value; renderMain(); });
 document.getElementById('filter-tag').addEventListener('change', e => { state.filter.tag = e.target.value; renderMain(); });
-document.getElementById('btn-new').addEventListener('click', () => openModal(null));
 document.getElementById('btn-refresh').addEventListener('click', renderMain);
-document.getElementById('modal-close').addEventListener('click', closeModal);
-document.getElementById('form-cancel').addEventListener('click', closeModal);
-document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target===e.currentTarget) closeModal(); });
-document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
 
 refreshTagFilter();
 renderMain();

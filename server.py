@@ -20,7 +20,7 @@ if _env_path.exists():
 
 CLIENT_ID = os.environ.get("LIMBLE_CLIENT_ID", "")
 CLIENT_SECRET = os.environ.get("LIMBLE_CLIENT_SECRET", "")
-BASE_URL = os.environ.get("LIMBLE_BASE_URL", "https://api.limblecmms.com").rstrip("/")
+BASE_URL = os.environ.get("LIMBLE_BASE_URL", "https://api.limblecmms.com/v2").rstrip("/")
 PORT = int(os.environ.get("PORT", 3002))
 
 _creds = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
@@ -39,6 +39,7 @@ def limble_request(method: str, path: str, body: bytes | None = None) -> tuple[i
         "Authorization": AUTH_HEADER,
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (compatible; LimbleDash/1.0)",
     }
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
@@ -81,31 +82,32 @@ class Handler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/workorders":
-            # Forward query string to Limble
-            limble_path = "/workOrders" + (self.path[len("/api/workorders"):] or "")
-            status, data = limble_request("GET", limble_path)
+            qs = self.path[len("/api/workorders"):]
+            status, data = limble_request("GET", "/tasks" + qs)
+            self.send_json(status, data)
+            return
+
+        if path == "/api/statuses":
+            status, data = limble_request("GET", "/statuses")
+            self.send_json(status, data)
+            return
+
+        if path == "/api/priorities":
+            status, data = limble_request("GET", "/priorities")
+            self.send_json(status, data)
+            return
+
+        if path == "/api/locations":
+            status, data = limble_request("GET", "/locations")
             self.send_json(status, data)
             return
 
         self.send_error(404, "Not found")
 
     def do_POST(self):
-        if self.path == "/api/workorders":
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length) if length else None
-            status, data = limble_request("POST", "/workOrders", body)
-            self.send_json(status, data)
-            return
         self.send_error(404, "Not found")
 
     def do_PATCH(self):
-        if self.path.startswith("/api/workorders/"):
-            wo_id = self.path[len("/api/workorders/"):].split("?")[0]
-            length = int(self.headers.get("Content-Length", 0))
-            body = self.rfile.read(length) if length else None
-            status, data = limble_request("PATCH", f"/workOrders/{wo_id}", body)
-            self.send_json(status, data)
-            return
         self.send_error(404, "Not found")
 
 

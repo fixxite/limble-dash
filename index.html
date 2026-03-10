@@ -14,30 +14,17 @@
     </div>
     <div class="header-right">
       <button id="btn-refresh" class="btn btn-secondary" title="Refresh">&#8635; Refresh</button>
-      <button id="btn-new" class="btn btn-primary">+ New Work Order</button>
     </div>
   </header>
 
   <div class="filter-bar">
     <label class="filter-group">
       Status:
-      <select id="filter-status">
-        <option value="all">All</option>
-        <option value="open">Open</option>
-        <option value="inProgress">In Progress</option>
-        <option value="completed">Completed</option>
-      </select>
+      <select id="filter-status"><option value="all">All</option></select>
     </label>
     <label class="filter-group">
       Priority:
-      <select id="filter-priority">
-        <option value="all">All</option>
-        <option value="none">None</option>
-        <option value="low">Low</option>
-        <option value="medium">Medium</option>
-        <option value="high">High</option>
-        <option value="critical">Critical</option>
-      </select>
+      <select id="filter-priority"><option value="all">All</option></select>
     </label>
     <label class="filter-group">
       Tag:
@@ -47,67 +34,6 @@
   </div>
 
   <main id="main" class="main"></main>
-
-  <!-- Modal -->
-  <div id="modal-overlay" class="modal-overlay hidden">
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="modal-header">
-        <h2 id="modal-title">Work Order</h2>
-        <button id="modal-close" class="modal-close" aria-label="Close">&times;</button>
-      </div>
-      <form id="wo-form" class="modal-body" novalidate>
-        <label class="field">
-          <span>Title <span class="required">*</span></span>
-          <input type="text" name="name" required />
-        </label>
-        <label class="field">
-          <span>Description</span>
-          <textarea name="description" rows="3"></textarea>
-        </label>
-        <div class="field-row">
-          <label class="field">
-            <span>Priority</span>
-            <select name="priorityID">
-              <option value="">None</option>
-              <option value="1">Low</option>
-              <option value="2">Medium</option>
-              <option value="3">High</option>
-              <option value="4">Critical</option>
-            </select>
-          </label>
-          <label class="field">
-            <span>Status</span>
-            <select name="statusID">
-              <option value="1">Open</option>
-              <option value="2">In Progress</option>
-              <option value="3">Completed</option>
-            </select>
-          </label>
-        </div>
-        <label class="field">
-          <span>Due Date</span>
-          <input type="date" name="dueDate" />
-        </label>
-        <div class="field">
-          <span class="tag-field-label">Tags</span>
-          <div id="tag-selector" class="tag-selector"></div>
-          <div class="tag-new-row">
-            <input type="text" id="new-tag-input" placeholder="New tag name…" maxlength="30" />
-            <input type="color" id="new-tag-color" value="#3b82f6" title="Tag color" />
-            <button type="button" id="btn-create-tag" class="btn btn-secondary">+ Add</button>
-          </div>
-          <div class="tag-manage">
-            <div id="tag-manage-list" class="tag-manage-list"></div>
-          </div>
-        </div>
-        <div id="form-error" class="form-error hidden"></div>
-        <div class="modal-footer">
-          <button type="button" id="form-cancel" class="btn btn-secondary">Cancel</button>
-          <button type="submit" id="form-submit" class="btn btn-primary">Save</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
   <script src="/app.js"></script>
 </body>
