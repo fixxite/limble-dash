@@ -4,6 +4,7 @@
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const REFRESH_INTERVAL_MS = 60_000;
+const TASK_TYPES = { 1: 'Planned Maintenance', 2: 'Work Order', 4: 'Preventive Maintenance', 6: 'Work Request' };
 const TAGS_STORAGE_KEY = 'limble_dash_tags';
 const WO_TAGS_STORAGE_KEY = 'limble_dash_wo_tags';
 
@@ -11,16 +12,17 @@ const WO_TAGS_STORAGE_KEY = 'limble_dash_wo_tags';
 
 const state = {
   workOrders: [],
-  filter: { status: 'all', priority: 'all', tag: 'all', location: 'all' },
+  filter: { status: 'all', priority: 'all', tag: 'all', location: 'all', search: '' },
   loading: false,
   error: null,
   tags: loadTagsFromStorage(),
   nextTagId: 0,
   woTagMap: loadWoTagsFromStorage(),
   // Populated after API fetch
-  statusMap: {},    // { [wo.status int]: { label, cls } }
+  statusMap: {},    // { [wo.statusID]: { label, cls } }
   priorityMap: {},  // { [wo.priority int]: { label, cls, color } }
   locationMap: {},  // { [locationID]: name }
+  userMap: {},      // { [userID]: 'First Last' }
 };
 state.nextTagId = state.tags.length
   ? Math.max(...state.tags.map(t => t.id)) + 1
@@ -54,16 +56,18 @@ async function apiFetch(path) {
   return data;
 }
 
-async function fetchWorkOrders() {
+async function fetchWorkOrders(bust = false) {
+  const qs = bust ? '?fresh=1' : '';
   state.loading = true;
   state.error = null;
   renderMain();
   try {
-    const [tasks, statuses, priorities, locations] = await Promise.all([
-      apiFetch('/api/workorders'),
-      apiFetch('/api/statuses'),
-      apiFetch('/api/priorities'),
-      apiFetch('/api/locations'),
+    const [tasks, statuses, priorities, locations, users] = await Promise.all([
+      apiFetch('/api/workorders' + qs),
+      apiFetch('/api/statuses'   + qs),
+      apiFetch('/api/priorities' + qs),
+      apiFetch('/api/locations'  + qs),
+      apiFetch('/api/users'      + qs),
     ]);
 
     // Build status map keyed by wo.status integer
@@ -86,14 +90,24 @@ async function fetchWorkOrders() {
       state.locationMap[l.locationID] = l.name;
     }
 
-    // Filter out templates
-    const raw = Array.isArray(tasks) ? tasks : (tasks.data ?? []);
-    state.workOrders = raw.filter(t => !t.template);
+    // Build user map
+    state.userMap = {};
+    for (const u of (Array.isArray(users) ? users : [])) {
+      state.userMap[u.userID] = `${u.firstName} ${u.lastName}`.trim();
+    }
+
+    state.workOrders = Array.isArray(tasks) ? tasks : (tasks.data ?? []);
 
     refreshStatusFilter();
     refreshPriorityFilter();
     refreshLocationSwitch();
     refreshTagFilter();
+
+    // Sync open tasks to Trello in background (silent, no await)
+    fetch('/api/trello/sync', { method: 'POST' })
+      .then(r => r.json())
+      .then(r => { if (r.created > 0) console.log(`Trello: ${r.created} new card(s) created`); })
+      .catch(() => {});  // silent failure — Trello down or not configured
   } catch (err) {
     state.error = err.message;
   } finally {
@@ -199,10 +213,18 @@ function setLocation(name) {
 
 function applyFilters(orders) {
   return orders.filter(wo => {
-    const { status, priority, tag, location } = state.filter;
+    const { status, priority, tag, location, search } = state.filter;
+
+    if (search) {
+      const q = search.toLowerCase();
+      const assignedTo = (wo.userID && state.userMap[wo.userID]) || '';
+      if (!(wo.name || '').toLowerCase().includes(q) &&
+          !(wo.requestorName || '').toLowerCase().includes(q) &&
+          !assignedTo.toLowerCase().includes(q)) return false;
+    }
 
     if (status !== 'all') {
-      const cls = state.statusMap[String(wo.status ?? '')]?.cls ?? '';
+      const cls = state.statusMap[String(wo.statusID ?? '')]?.cls ?? '';
       if (cls !== status) return false;
     }
 
@@ -241,7 +263,7 @@ function fmtDate(val) {
 }
 
 function fmtStatus(wo) {
-  return state.statusMap[String(wo.status ?? '')] ?? { label: 'Unknown', cls: 'unknown' };
+  return state.statusMap[String(wo.statusID ?? '')] ?? { label: 'Unknown', cls: 'unknown' };
 }
 
 function fmtPriority(wo) {
@@ -251,13 +273,18 @@ function fmtPriority(wo) {
 function renderCard(wo) {
   const status = fmtStatus(wo);
   const priority = fmtPriority(wo);
-  const locName = (wo.locationID && state.locationMap[wo.locationID]) || wo.location || '';
+  const assignedTo = (wo.userID && state.userMap[wo.userID]) || '';
+  const taskType = TASK_TYPES[wo.type] || '';
   const tags = woTagIds(wo);
   const card = el('div', 'card');
 
+  const limbleUrl = `https://app.limblecmms.com/taskList?taskID=${wo.taskID}`;
+
+  card.className = 'card card-clickable';
   card.innerHTML = `
     <div class="card-header">
       <span class="card-title">${escHtml(wo.name || 'Untitled')}</span>
+      <a class="card-id card-limble-link" href="${limbleUrl}" target="_blank" rel="noopener" title="Open in Limble">#${wo.taskID} &#x2197;</a>
       <span class="badge badge-${status.cls}">${escHtml(status.label)}</span>
     </div>
     <div class="card-meta">
@@ -265,12 +292,18 @@ function renderCard(wo) {
         <span class="priority-dot" style="background:${priority.color}" title="Priority: ${escHtml(priority.label)}"></span>
         <span><span class="label">Priority:</span> ${escHtml(priority.label)}</span>
       </div>
-      ${locName ? `<div class="card-meta-row"><span class="label">Location:</span> ${escHtml(locName)}</div>` : ''}
-      ${wo.dueDate || wo.due ? `<div class="card-meta-row"><span class="label">Due:</span> ${fmtDate(wo.due || wo.dueDate)}</div>` : ''}
+      ${taskType ? `<div class="card-meta-row"><span class="label">Type:</span> ${escHtml(taskType)}</div>` : ''}
+      ${assignedTo ? `<div class="card-meta-row"><span class="label">Assigned:</span> ${escHtml(assignedTo)}</div>` : '<div class="card-meta-row"><span class="label">Assigned:</span> <span style="color:var(--color-text-muted)">Unassigned</span></div>'}
     </div>
     ${tagChipsHtml(tags)}
-    <div class="card-footer">Updated ${fmtDate(wo.lastEdited || wo.updatedAt)}</div>
+    <div class="card-footer">
+      <span>Updated ${fmtDate(wo.lastEdited || wo.updatedAt)}</span>
+    </div>
   `;
+
+  card.addEventListener('click', e => {
+    if (!e.target.closest('a')) openDetail(wo);
+  });
 
   return card;
 }
@@ -305,6 +338,52 @@ function renderMain() {
   main.appendChild(grid);
 }
 
+// ── Detail modal ─────────────────────────────────────────────────────────────
+
+function openDetail(wo) {
+  document.getElementById('detail-title').textContent = wo.name || 'Untitled';
+
+  const limbleUrl        = `https://app.limblecmms.com/taskList?taskID=${wo.taskID}`;
+  const requestorName    = (wo.requestorName  || '').trim();
+  const requestorEmail   = (wo.requestorEmail || '').trim();
+  const requestorComments = (wo.requestorDescription || '').trim();
+
+  const rows = [];
+  if (requestorName) rows.push(`<div class="field"><span>Requestor</span><p class="detail-value">${escHtml(requestorName)}${requestorEmail ? ` &lt;${escHtml(requestorEmail)}&gt;` : ''}</p></div>`);
+  rows.push(`<div class="field"><span>Requestor Comments</span>${requestorComments
+    ? `<p class="detail-comments">${escHtml(requestorComments)}</p>`
+    : `<p class="detail-value detail-empty">None</p>`}</div>`);
+  rows.push(`<div class="field"><span>Comments</span><div id="detail-comments-list"><div class="spinner detail-spinner"></div></div></div>`);
+  rows.push(`<div class="detail-link"><a href="${limbleUrl}" target="_blank" rel="noopener">Open in Limble &#x2197;</a></div>`);
+
+  document.getElementById('detail-body').innerHTML = rows.join('');
+  document.getElementById('detail-modal').classList.remove('hidden');
+
+  apiFetch(`/api/workorders/${wo.taskID}/comments`).then(comments => {
+    const el = document.getElementById('detail-comments-list');
+    if (!el) return;
+    comments = comments.filter(c => !c.comment.includes('Changed Due Date'));
+    if (!Array.isArray(comments) || comments.length === 0) {
+      el.innerHTML = `<p class="detail-value detail-empty">No comments.</p>`;
+      return;
+    }
+    el.innerHTML = comments.map(c => {
+      const author = (c.userID && state.userMap[c.userID]) || (c.commentEmailAddress) || 'Unknown';
+      return `<div class="comment-item">
+        <div class="comment-meta">${escHtml(author)} &middot; ${fmtDate(c.timestamp)}</div>
+        <div class="comment-text">${escHtml(c.comment)}</div>
+      </div>`;
+    }).join('');
+  }).catch(() => {
+    const el = document.getElementById('detail-comments-list');
+    if (el) el.innerHTML = `<p class="detail-value detail-empty">Failed to load comments.</p>`;
+  });
+}
+
+function closeDetail() {
+  document.getElementById('detail-modal').classList.add('hidden');
+}
+
 // ── Utilities ────────────────────────────────────────────────────────────────
 
 function escHtml(str) {
@@ -324,7 +403,16 @@ function init() {
     state.filter.tag = e.target.value; renderMain();
   });
 
-  document.getElementById('btn-refresh').addEventListener('click', fetchWorkOrders);
+  document.getElementById('btn-refresh').addEventListener('click', () => fetchWorkOrders(true));
+  document.getElementById('search').addEventListener('input', e => {
+    state.filter.search = e.target.value.trim();
+    renderMain();
+  });
+
+  document.getElementById('detail-close').addEventListener('click', closeDetail);
+  document.getElementById('detail-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeDetail();
+  });
 
   refreshTagFilter();
   fetchWorkOrders();
