@@ -15,6 +15,9 @@
     <div class="header-right">
       <input id="search" type="search" class="header-search" placeholder="Search work orders…" autocomplete="off" />
       <button id="btn-refresh" class="btn btn-secondary" title="Refresh">&#8635; Refresh</button>
+      <button id="btn-trello" class="btn btn-secondary trello-badge-btn" title="Trello sync">
+        <span id="trello-dot" class="trello-dot trello-dot-gray"></span> Trello
+      </button>
     </div>
   </header>
 
@@ -49,6 +52,18 @@
       <div class="modal-body" id="detail-body"></div>
     </div>
   </div>
+
+  <div id="trello-modal" class="modal-overlay hidden">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="trello-modal-title">Trello Config</h2>
+        <button id="trello-close" class="modal-close" aria-label="Close">&#x2715;</button>
+      </div>
+      <div class="modal-body" id="trello-modal-body"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
 
   <script src="/app.js"></script>
 </body>

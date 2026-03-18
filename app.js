@@ -23,6 +23,7 @@ const state = {
   priorityMap: {},  // { [wo.priority int]: { label, cls, color } }
   locationMap: {},  // { [locationID]: name }
   userMap: {},      // { [userID]: 'First Last' }
+  trello: { configured: false, list_name: '', board_name: '' },
 };
 state.nextTagId = state.tags.length
   ? Math.max(...state.tags.map(t => t.id)) + 1
@@ -106,7 +107,14 @@ async function fetchWorkOrders(bust = false) {
     // Sync open tasks to Trello in background (silent, no await)
     fetch('/api/trello/sync', { method: 'POST' })
       .then(r => r.json())
-      .then(r => { if (r.created > 0) console.log(`Trello: ${r.created} new card(s) created`); })
+      .then(r => {
+        if (r.created > 0 || r.archived > 0) {
+          const parts = [];
+          if (r.created > 0) parts.push(`${r.created} new card(s)`);
+          if (r.archived > 0) parts.push(`${r.archived} archived`);
+          showToast(`Trello: ${parts.join(', ')}`);
+        }
+      })
       .catch(() => {});  // silent failure — Trello down or not configured
   } catch (err) {
     state.error = err.message;
@@ -267,7 +275,9 @@ function fmtStatus(wo) {
 }
 
 function fmtPriority(wo) {
-  return state.priorityMap[String(wo.priority ?? '')] ?? { label: '—', cls: 'unknown', color: '#9ca3af' };
+  const p = state.priorityMap[String(wo.priority ?? '')] ?? { label: '—', cls: 'unknown', color: '#9ca3af' };
+  if (p.label.toLowerCase() === 'urgent') return { ...p, color: '#f97316' };
+  return p;
 }
 
 function renderCard(wo) {
@@ -324,7 +334,14 @@ function renderMain() {
     return;
   }
 
-  const filtered = applyFilters(state.workOrders);
+  const PRIORITY_ORDER = ['urgent', 'standard', 'can wait'];
+  function priorityRank(wo) {
+    const label = (state.priorityMap[String(wo.priority ?? '')]?.label ?? '').toLowerCase();
+    const idx = PRIORITY_ORDER.indexOf(label);
+    return idx === -1 ? PRIORITY_ORDER.length : idx;
+  }
+  const filtered = applyFilters(state.workOrders)
+    .sort((a, b) => priorityRank(a) - priorityRank(b));
   countEl.textContent = `${filtered.length} of ${state.workOrders.length} work orders`;
 
   if (filtered.length === 0) {
@@ -390,6 +407,142 @@ function escHtml(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// ── Toast ─────────────────────────────────────────────────────────────────────
+
+function showToast(msg, duration = 3000) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.add('hidden'), duration);
+}
+
+// ── Trello config UI ──────────────────────────────────────────────────────────
+
+function updateTrelloDot(configured) {
+  const dot = document.getElementById('trello-dot');
+  if (!dot) return;
+  dot.className = 'trello-dot ' + (configured ? 'trello-dot-green' : 'trello-dot-gray');
+}
+
+async function openTrelloConfig() {
+  document.getElementById('trello-modal').classList.remove('hidden');
+  const cfg = await apiFetch('/api/trello/config').catch(() => ({ configured: false }));
+  state.trello = cfg;
+  updateTrelloDot(cfg.configured);
+  cfg.configured ? showConnectedStep(cfg) : showCredentialsStep();
+}
+
+function showCredentialsStep() {
+  document.getElementById('trello-modal-title').textContent = 'Connect Trello';
+  document.getElementById('trello-modal-body').innerHTML = `
+    <p>Enter your Trello credentials to enable dispatch sync.</p>
+    <p class="field-hint">Get API key: <a href="https://trello.com/power-ups/admin" target="_blank">trello.com/power-ups/admin</a></p>
+    <div class="field">
+      <label>API Key</label>
+      <input id="trello-key-input" type="text" placeholder="API key" />
+    </div>
+    <div class="field">
+      <label>Token</label>
+      <input id="trello-token-input" type="text" placeholder="Token" />
+      <p class="field-hint">Token URL: https://trello.com/1/authorize?expiration=never&amp;scope=read,write&amp;response_type=token&amp;key=YOUR_KEY</p>
+    </div>
+    <button id="trello-connect-btn" class="btn btn-primary">Next: Choose List &rarr;</button>
+  `;
+  document.getElementById('trello-connect-btn').addEventListener('click', connectTrello);
+}
+
+async function connectTrello() {
+  const key = document.getElementById('trello-key-input').value.trim();
+  const token = document.getElementById('trello-token-input').value.trim();
+  if (!key || !token) { showToast('Enter both API key and token'); return; }
+  const btn = document.getElementById('trello-connect-btn');
+  btn.disabled = true; btn.textContent = 'Fetching boards\u2026';
+  try {
+    const boards = await apiFetch(`/api/trello/boards?key=${encodeURIComponent(key)}&token=${encodeURIComponent(token)}`);
+    showBoardStep(boards, key, token);
+  } catch (e) {
+    showToast('Invalid credentials or Trello unreachable');
+    btn.disabled = false; btn.textContent = 'Next: Choose List \u2192';
+  }
+}
+
+function showBoardStep(boards, key, token) {
+  document.getElementById('trello-modal-title').textContent = 'Choose Inbox List';
+  const boardOpts = boards.map(b => `<option value="${b.boardID}">${escHtml(b.board)}</option>`).join('');
+  const firstLists = boards[0]?.lists ?? [];
+  const listOpts = firstLists.map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
+  document.getElementById('trello-modal-body').innerHTML = `
+    <p>Choose the Trello list where new Open work orders will appear.</p>
+    <div class="field">
+      <label>Board</label>
+      <select id="trello-board-sel">${boardOpts}</select>
+    </div>
+    <div class="field">
+      <label>Inbox List</label>
+      <select id="trello-list-sel">${listOpts}</select>
+    </div>
+    <button id="trello-save-btn" class="btn btn-primary">Save</button>
+  `;
+  const saveBtn = document.getElementById('trello-save-btn');
+  saveBtn._key = key;
+  saveBtn._token = token;
+  saveBtn._boards = boards;
+  document.getElementById('trello-board-sel').addEventListener('change', () => onBoardChange(boards));
+  saveBtn.addEventListener('click', saveTrelloConfig);
+}
+
+function onBoardChange(boards) {
+  const bid = document.getElementById('trello-board-sel').value;
+  const board = boards.find(b => b.boardID === bid);
+  const lists = board?.lists ?? [];
+  document.getElementById('trello-list-sel').innerHTML =
+    lists.map(l => `<option value="${l.id}">${escHtml(l.name)}</option>`).join('');
+}
+
+async function saveTrelloConfig() {
+  const btn = document.getElementById('trello-save-btn');
+  const key = btn._key; const token = btn._token; const boards = btn._boards;
+  const bid = document.getElementById('trello-board-sel').value;
+  const lid = document.getElementById('trello-list-sel').value;
+  const board = boards.find(b => b.boardID === bid);
+  const list = board?.lists.find(l => l.id === lid);
+  btn.disabled = true; btn.textContent = 'Saving\u2026';
+  try {
+    const resp = await fetch('/api/trello/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ api_key: key, token, list_id: lid, list_name: list?.name, board_name: board?.board }),
+    });
+    if (!resp.ok) throw new Error('Save failed');
+    state.trello = { configured: true, list_name: list?.name, board_name: board?.board };
+    updateTrelloDot(true);
+    showConnectedStep(state.trello);
+    showToast('Trello connected');
+  } catch (e) {
+    showToast('Save failed \u2014 check credentials');
+    btn.disabled = false; btn.textContent = 'Save';
+  }
+}
+
+function showConnectedStep(cfg) {
+  document.getElementById('trello-modal-title').textContent = 'Trello Connected';
+  document.getElementById('trello-modal-body').innerHTML = `
+    <p class="trello-connected-msg">&#10003; Connected to <strong>${escHtml(cfg.board_name || 'Trello')}</strong> &mdash; inbox list: <strong>${escHtml(cfg.list_name || cfg.list_id || '')}</strong></p>
+    <p>Open work orders sync automatically after each refresh. Cards are archived when WOs close.</p>
+    <button id="trello-disconnect-btn" class="btn btn-secondary">Disconnect</button>
+  `;
+  document.getElementById('trello-disconnect-btn').addEventListener('click', disconnectTrello);
+}
+
+async function disconnectTrello() {
+  await fetch('/api/trello/config', { method: 'DELETE' });
+  state.trello = { configured: false };
+  updateTrelloDot(false);
+  showToast('Trello disconnected');
+  showCredentialsStep();
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 
 function init() {
@@ -412,6 +565,19 @@ function init() {
   document.getElementById('detail-close').addEventListener('click', closeDetail);
   document.getElementById('detail-modal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeDetail();
+  });
+
+  // Load Trello config state (updates dot)
+  apiFetch('/api/trello/config')
+    .then(cfg => { state.trello = cfg; updateTrelloDot(cfg.configured); })
+    .catch(() => {});
+
+  document.getElementById('btn-trello').addEventListener('click', openTrelloConfig);
+  document.getElementById('trello-close').addEventListener('click', () => {
+    document.getElementById('trello-modal').classList.add('hidden');
+  });
+  document.getElementById('trello-modal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) document.getElementById('trello-modal').classList.add('hidden');
   });
 
   refreshTagFilter();

@@ -62,6 +62,36 @@ def init_db():
                 synced_at     INTEGER NOT NULL
             )
         """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS settings (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+
+def settings_get(key):
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key=?", (key,)).fetchone()
+    return row[0] if row else None
+
+def settings_set(key, value):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?,?)", (key, value))
+
+def settings_delete(*keys):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(f"DELETE FROM settings WHERE key IN ({','.join('?'*len(keys))})", keys)
+
+def get_trello_config():
+    if TRELLO_API_KEY and TRELLO_TOKEN and TRELLO_LIST_ID:
+        return {'api_key': TRELLO_API_KEY, 'token': TRELLO_TOKEN, 'list_id': TRELLO_LIST_ID}
+    key = settings_get('trello_api_key')
+    tok = settings_get('trello_token')
+    lid = settings_get('trello_list_id')
+    if key and tok and lid:
+        return {'api_key': key, 'token': tok, 'list_id': lid}
+    return {}
+
 
 def cache_get(key: str, ttl: int) -> bytes | None:
     with sqlite3.connect(DB_PATH) as conn:
@@ -80,8 +110,11 @@ def cache_set(key: str, data: bytes):
         )
 
 
-def trello_request(method, path, params=None, body=None):
-    base_params = f"key={TRELLO_API_KEY}&token={TRELLO_TOKEN}"
+def trello_request(method, path, params=None, body=None, api_key=None, token=None):
+    cfg = get_trello_config()
+    key = api_key or cfg.get('api_key', '')
+    tok = token or cfg.get('token', '')
+    base_params = f"key={key}&token={tok}"
     qs = ("&" + "&".join(f"{k}={urllib.parse.quote(str(v))}" for k, v in params.items())) if params else ""
     url = f"{TRELLO_BASE}{path}?{base_params}{qs}"
     req = urllib.request.Request(url, data=body, method=method)
@@ -94,13 +127,36 @@ def trello_request(method, path, params=None, body=None):
         return e.code, e.read()
 
 
-def build_trello_card(task):
+def get_or_create_urgent_label(cfg):
+    """Return the orange Trello label ID for the configured list's board, creating it if needed."""
+    cached = settings_get('trello_urgent_label_id')
+    if cached:
+        return cached
+    status, data = trello_request("GET", f"/lists/{cfg['list_id']}", {"fields": "idBoard"})
+    if status != 200:
+        return None
+    board_id = json.loads(data).get("idBoard")
+    if not board_id:
+        return None
+    status, data = trello_request("GET", f"/boards/{board_id}/labels", {"limit": "100"})
+    if status == 200:
+        for lbl in json.loads(data):
+            if lbl.get("color") == "orange":
+                settings_set('trello_urgent_label_id', lbl["id"])
+                return lbl["id"]
+    body = json.dumps({"name": "Urgent", "color": "orange", "idBoard": board_id}).encode()
+    status, data = trello_request("POST", "/labels", body=body)
+    if status == 200:
+        lbl_id = json.loads(data)["id"]
+        settings_set('trello_urgent_label_id', lbl_id)
+        return lbl_id
+    return None
+
+
+def build_trello_card(task, list_id, red_label_id=None, urgent_level=None):
     PRIORITY_NAMES = {3: "Critical", 2: "High", 1: "Medium", 0: "Low"}
     TYPE_NAMES = {1: "Planned Maintenance", 2: "Work Order", 4: "Preventive Maintenance", 6: "Work Request"}
     limble_url = f"https://app.limblecmms.com/taskList?taskID={task['taskID']}"
-    due_iso = None
-    if task.get("due"):
-        due_iso = datetime.datetime.utcfromtimestamp(task["due"]).strftime("%Y-%m-%dT%H:%M:%S.000Z")
 
     lines = []
     if task.get("priority") is not None:
@@ -114,12 +170,12 @@ def build_trello_card(task):
     lines.append(f"\n🔗 [Open in Limble]({limble_url})")
 
     card = {
-        "idList": TRELLO_LIST_ID,
-        "name": task.get("name") or "Untitled",
+        "idList": list_id,
+        "name": f"#{task['taskID']} {task.get('name') or 'Untitled'}",
         "desc": "\n".join(lines),
     }
-    if due_iso:
-        card["due"] = due_iso
+    if red_label_id and urgent_level is not None and task.get("priority") == urgent_level:
+        card["idLabels"] = red_label_id
     return json.dumps(card).encode()
 
 
@@ -248,12 +304,30 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(200, data)
             return
 
+        if path == "/api/trello/config":
+            cfg = get_trello_config()
+            if not cfg:
+                self.send_json(200, b'{"configured": false}')
+                return
+            list_name = settings_get('trello_list_name') or cfg.get('list_id', '')
+            board_name = settings_get('trello_board_name') or ''
+            self.send_json(200, json.dumps({
+                "configured": True,
+                "list_id": cfg['list_id'],
+                "list_name": list_name,
+                "board_name": board_name,
+            }).encode())
+            return
+
         if path == "/api/trello/boards":
-            _, data = trello_request("GET", "/members/me/boards", {"fields": "name,id"})
+            qs = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+            ak = qs.get("key", [None])[0]
+            tok = qs.get("token", [None])[0]
+            _, data = trello_request("GET", "/members/me/boards", {"fields": "name,id"}, api_key=ak, token=tok)
             boards = json.loads(data)
             result = []
             for b in boards:
-                _, ldata = trello_request("GET", f"/boards/{b['id']}/lists", {"fields": "name,id"})
+                _, ldata = trello_request("GET", f"/boards/{b['id']}/lists", {"fields": "name,id"}, api_key=ak, token=tok)
                 result.append({"board": b["name"], "boardID": b["id"], "lists": json.loads(ldata)})
             self.send_json(200, json.dumps(result).encode())
             return
@@ -262,8 +336,33 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.path.split("?")[0]
+
+        if path == "/api/trello/config":
+            length = int(self.headers.get("Content-Length", 0))
+            body = json.loads(self.rfile.read(length))
+            ak = body.get("api_key", "").strip()
+            tok = body.get("token", "").strip()
+            lid = body.get("list_id", "").strip()
+            lname = body.get("list_name", "").strip()
+            bname = body.get("board_name", "").strip()
+            if not (ak and tok and lid):
+                self.send_json(400, b'{"error": "api_key, token, list_id required"}')
+                return
+            status, _ = trello_request("GET", "/members/me", api_key=ak, token=tok)
+            if status != 200:
+                self.send_json(400, b'{"error": "Invalid Trello credentials"}')
+                return
+            settings_set('trello_api_key', ak)
+            settings_set('trello_token', tok)
+            settings_set('trello_list_id', lid)
+            if lname: settings_set('trello_list_name', lname)
+            if bname: settings_set('trello_board_name', bname)
+            self.send_json(200, b'{"ok": true}')
+            return
+
         if path == "/api/trello/sync":
-            if not (TRELLO_API_KEY and TRELLO_TOKEN and TRELLO_LIST_ID):
+            cfg = get_trello_config()
+            if not cfg:
                 self.send_json(200, b'{"skipped": true, "reason": "Trello not configured"}')
                 return
 
@@ -275,14 +374,36 @@ class Handler(BaseHTTPRequestHandler):
             open_tasks = [t for t in tasks if t.get("statusID") == 0]
 
             with sqlite3.connect(DB_PATH) as conn:
-                synced = {row[0] for row in conn.execute("SELECT task_id FROM trello_sync")}
+                synced = {row[0]: row[1] for row in conn.execute("SELECT task_id, trello_card_id FROM trello_sync")}
+
+            # Verify synced cards for open tasks still exist in Trello; drop stale entries so they get recreated
+            open_ids = {t['taskID'] for t in open_tasks}
+            for task_id, card_id in list(synced.items()):
+                if task_id not in open_ids:
+                    continue  # archive step handles these
+                st, dat = trello_request("GET", f"/cards/{card_id}", {"fields": "id,closed"})
+                if st != 200 or json.loads(dat).get("closed"):
+                    with sqlite3.connect(DB_PATH) as conn:
+                        conn.execute("DELETE FROM trello_sync WHERE task_id=?", (task_id,))
+                    del synced[task_id]
+
+            red_label_id = get_or_create_urgent_label(cfg)
+
+            # Resolve which priorityLevel maps to "Urgent" from cached priorities
+            urgent_level = None
+            cached_priorities = cache_get("priorities", REF_TTL * 24)
+            if cached_priorities:
+                for p in json.loads(cached_priorities):
+                    if p.get("name", "").strip().lower() == "urgent":
+                        urgent_level = p.get("priorityLevel")
+                        break
 
             created = 0
             for task in open_tasks:
                 tid = task["taskID"]
                 if tid in synced:
                     continue
-                card_body = build_trello_card(task)
+                card_body = build_trello_card(task, cfg['list_id'], red_label_id, urgent_level)
                 status, resp = trello_request("POST", "/cards", body=card_body)
                 if status == 200:
                     card = json.loads(resp)
@@ -293,7 +414,27 @@ class Handler(BaseHTTPRequestHandler):
                         )
                     created += 1
 
-            self.send_json(200, json.dumps({"created": created, "total_open": len(open_tasks)}).encode())
+            # Archive cards for tasks no longer open
+            with sqlite3.connect(DB_PATH) as conn:
+                all_synced = conn.execute("SELECT task_id, trello_card_id FROM trello_sync").fetchall()
+            archived = 0
+            for task_id, card_id in all_synced:
+                if task_id not in open_ids:  # open_ids computed in verification step above
+                    status, _ = trello_request("PUT", f"/cards/{card_id}", body=b'{"closed":true}')
+                    with sqlite3.connect(DB_PATH) as conn:
+                        conn.execute("DELETE FROM trello_sync WHERE task_id=?", (task_id,))
+                    if status == 200:
+                        archived += 1
+
+            self.send_json(200, json.dumps({"created": created, "archived": archived, "total_open": len(open_tasks)}).encode())
+            return
+        self.send_error(404, "Not found")
+
+    def do_DELETE(self):
+        path = self.path.split("?")[0]
+        if path == "/api/trello/config":
+            settings_delete('trello_api_key', 'trello_token', 'trello_list_id', 'trello_list_name', 'trello_board_name', 'trello_red_label_id', 'trello_urgent_label_id')
+            self.send_json(200, b'{"ok": true}')
             return
         self.send_error(404, "Not found")
 

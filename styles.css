@@ -348,3 +348,22 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 .comment-item:last-child { border-bottom: none; }
 .comment-meta { font-size: 11px; color: var(--color-text-muted); margin-bottom: 3px; }
 .comment-text { font-size: 13px; color: var(--color-text); white-space: pre-wrap; line-height: 1.5; }
+
+/* ── Trello badge ── */
+.trello-badge-btn { display: flex; align-items: center; gap: 6px; }
+.trello-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; }
+.trello-dot-gray  { background: #9ca3af; }
+.trello-dot-green { background: #22c55e; }
+
+/* ── Toast ── */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #1e293b; color: #f8fafc; padding: 10px 20px; border-radius: 8px;
+  font-size: 0.875rem; z-index: 1000; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.toast.hidden { opacity: 0; }
+
+/* ── Trello config modal additions ── */
+.field-hint { font-size: 0.8rem; color: var(--color-text-muted); margin: 2px 0 8px; }
+.trello-connected-msg { color: var(--color-text); margin-bottom: 12px; }
